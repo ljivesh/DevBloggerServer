@@ -1,9 +1,14 @@
 const User = require('../models/userModel');
+const Session = require('../models/sessionModel');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const configs = require('../configs');
 
 const validate = async (req, res, next) => {
     
     const newUserData = {
+        firstName: req.body.firstName,
+        lastName: req.body.lastName,
         userName: req.body.userName,
         password: req.body.password,
         email: req.body.email,
@@ -73,7 +78,12 @@ const authenticate = async (req, res, next) => {
             if(match) {
 
                 resData.passwordMatched = true;
-                req.user = user;
+                req.user = {
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    userName: user.userName,
+                    email: user.email
+                };
                 req.resData = resData;
                 next();
             }
@@ -90,8 +100,91 @@ const authenticate = async (req, res, next) => {
     }
 }
 
+const generateToken = async (userName)=> {
+
+    console.log(userName);
+
+    try {
+        const token = jwt.sign({userName: userName}, configs.jwtSecret, {expiresIn: '4h'});
+
+        const decoded = jwt.verify(token, configs.jwtSecret);
+        const sessionData = {
+            userName: userName,
+            iat: decoded.iat,
+        };
+
+        const session = new Session(sessionData);
+        try {
+            await session.save();
+            return token;
+        } catch(error) {
+            console.log(error);
+        }
+
+    } catch(error) {
+        console.log(error);
+    }
+}
+
+const validateToken = async (req, res, next) => {
+    
+    if (!req.headers.authorization) {
+        return res.status(401).json({ error: "Not Authorized" });
+      }
+    
+    // Bearer <token>>
+    const authHeader = req.headers.authorization;
+    const token = authHeader.split(" ")[1];
+    
+    
+    try {
+        const payload = jwt.verify(token, configs.jwtSecret);
+        
+        const session = await Session.findSession(payload.userName, payload.iat);
+
+
+        if(session) {
+            
+            try {
+                const user = await User.findByUser(session.userName);
+                req.user = {
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    userName: user.userName,
+                    email: user.email,
+                };
+                next();
+            } catch(error) {
+                console.log(error);
+            }
+        }
+
+        else {
+            res.status(401).json({ error: "Not Authorized" });
+        }
+
+
+    } catch (error) {
+        return res.status(401).json({ error: "Not Authorized" });
+    }
+}
+
+const devalidateToken = async (token)=> {
+    const payload = jwt.verify(token, configs.jwtSecret);
+    try {
+        await Session.deleteSession(payload.userName, payload.iat);
+        return true;
+    }
+    catch (error) {
+        console.log(error);
+        return false;
+    }
+}
 
 module.exports = {
     authenticate,
     validate,
+    generateToken,
+    validateToken,
+    devalidateToken,
 };
