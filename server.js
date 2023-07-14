@@ -11,5 +11,7 @@ const userRoute = require('./routes/userRoutes');
 app.use('/api/user/', userRoute);
 
 
+app.get('/', (req, res)=> res.send("Server Running"));
+
 const port = configs.serverPort || 3000;
 app.listen(port, ()=> console.log(`Server Started on port ${port}`));
