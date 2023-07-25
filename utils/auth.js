@@ -7,8 +7,6 @@ const configs = require('../configs');
 const validate = async (req, res, next) => {
     
     const newUserData = {
-        firstName: req.body.firstName,
-        lastName: req.body.lastName,
         userName: req.body.userName,
         password: req.body.password,
         email: req.body.email,
@@ -102,7 +100,6 @@ const authenticate = async (req, res, next) => {
 
 const generateToken = async (userName)=> {
 
-    console.log(userName);
 
     try {
         const token = jwt.sign({userName: userName}, configs.jwtSecret, {expiresIn: '4h'});
@@ -148,24 +145,22 @@ const validateToken = async (req, res, next) => {
             try {
                 const user = await User.findByUser(session.userName);
                 req.user = {
-                    firstName: user.firstName,
-                    lastName: user.lastName,
                     userName: user.userName,
-                    email: user.email,
                 };
                 next();
             } catch(error) {
                 console.log(error);
+                res.status(500).json({msg: "User Database Error"});
             }
         }
 
         else {
-            res.status(401).json({ error: "Not Authorized" });
+            res.status(401).json({ error: "Not Authorized, Session Not Found" });
         }
 
 
     } catch (error) {
-        return res.status(401).json({ error: "Not Authorized" });
+        return res.status(401).json({ error: "Not Authorized, Session Database Error" });
     }
 }
 
